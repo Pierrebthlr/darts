@@ -71,6 +71,8 @@
   .win-btn { width: 100%; padding: 13px 0; border-radius: 10px; border: none; font-size: 15px; margin-bottom: 10px; cursor: pointer; }
   .win-btn.primary { background: #2563eb; color: #fff; font-weight: bold; }
   .win-btn.secondary { background: #374151; color: #f9fafb; }
+  .manual-toggle { display: block; width: 100%; text-align: center; background: none; border: none; color: #60a5fa; font-size: 12px; padding: 4px 0 12px; text-decoration: underline; }
+  .manual-input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #1f2937; color: #f9fafb; font-size: 18px; text-align: center; margin-bottom: 10px; }
 </style>
 </head>
 <body>
@@ -82,7 +84,7 @@ var MARKS = ["","／","✕","⊗"];
 var MC = {1:"#374151",2:"#1d4ed8",3:"#b91c1c"};
 var ML = {1:"Simple",2:"Double",3:"Triple"};
 
-var state = { screen:"setup", mode:"501", names:["Joueur 1","Joueur 2"], game:null, mult:1 };
+var state = { screen:"setup", mode:"501", names:["Joueur 1","Joueur 2"], game:null, mult:1, manualMode:false, manualVal:"" };
 
 function init501(names) {
   return { mode:"501", players:names.map(function(n){return {name:n,score:501};}), cur:0, round:1, throws:[], phase:"game", winner:null };
@@ -126,6 +128,17 @@ function doThrow(mult,val) {
     else state.game=Object.assign({},g,{players:players,throws:ts});
   }
   state.mult=1; render();
+}
+function doManualScore(pts) {
+  var g=state.game, p=g.players[g.cur];
+  var left=p.score-pts, bust=left<0||left===1, win=left===0;
+  var players=g.players.map(function(pl,i){
+    if(i!==g.cur) return pl;
+    return Object.assign({},pl,{score:bust?pl.score:left});
+  });
+  if(win) state.game=Object.assign({},g,{players:players,phase:"won",winner:g.cur,throws:[]});
+  else state.game=advanceTurn(Object.assign({},g,{players:players,throws:[]}));
+  state.manualMode=false; state.manualVal=""; state.mult=1; render();
 }
 function doUndo() {
   var g=state.game; if(!g.throws.length) return;
@@ -209,6 +222,20 @@ function renderGame() {
   var hint=div("turn-hint",["Tour de ",el("b",{},[p.name])]);
   if(g.mode==="501"&&g.throws.length>0) hint.appendChild(document.createTextNode(" · reste "+p.score));
   if(g.mode==="501"&&p.score<=170&&g.throws.length===0) hint.appendChild(el("div",{className:"finish-hint"},["⚡ Finish possible !"]));
+  if(g.mode==="501"&&state.manualMode) {
+    var manualInput=el("input",{className:"manual-input",type:"number",inputmode:"numeric",placeholder:"Score du round (0–180)",value:state.manualVal,oninput:function(e){state.manualVal=e.target.value;}});
+    var manualConfirm=btn("win-btn primary","✓ Valider",function(){
+      var pts=parseInt(state.manualVal,10);
+      if(isNaN(pts)||pts<0||pts>180){alert("Score invalide (0–180)");return;}
+      doManualScore(pts);
+    });
+    var manualCancel=btn("win-btn secondary","← Revenir aux fléchettes",function(){state.manualMode=false;state.manualVal="";render();});
+    return div("screen",[
+      div("g-header",[el("span",{},[g.mode==="501"?"🎯 501":"🦗 Cricket"]),btn("quit-btn","✕ Quitter",function(){state.game=null;state.screen="setup";render();})]),
+      sb,hint,manualInput,manualConfirm,manualCancel
+    ]);
+  }
+  var manualToggle=(g.mode==="501"&&g.throws.length===0)?btn("manual-toggle","✏️ Entrer le score du round",function(){state.manualMode=true;state.manualVal="";render();}):null;
   var slots=div("slots",[0,1,2].map(function(i){
     var t=g.throws[i];
     if(t){var s=div("slot filled",[div("slot-mult",[ML[t.mult]||""]),div("slot-val",[t.val===25?"Bull":t.val===0?"Miss":String(t.val)]),t.pts>0?div("slot-pts",["+"+t.pts]):null]);s.style.borderColor=MC[t.mult]||"#374151";return s;}
@@ -229,7 +256,7 @@ function renderGame() {
   ]);
   return div("screen",[
     div("g-header",[el("span",{},[g.mode==="501"?"🎯 501":"🦗 Cricket"]),btn("quit-btn","✕ Quitter",function(){state.game=null;state.screen="setup";render();})]),
-    sb,hint,slots,multRow,numGrid,actionRow
+    sb,hint,manualToggle,slots,multRow,numGrid,actionRow
   ]);
 }
 
