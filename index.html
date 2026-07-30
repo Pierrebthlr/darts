@@ -213,6 +213,82 @@ function buildSparkline(values) {
   return svg;
 }
 
+var DARTBOARD_ORDER=[20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+function polarPoint(cx,cy,r,angle) {
+  return [cx+r*Math.sin(angle), cy-r*Math.cos(angle)];
+}
+function annularSectorPath(cx,cy,rInner,rOuter,a0,a1) {
+  var p1=polarPoint(cx,cy,rOuter,a0), p2=polarPoint(cx,cy,rOuter,a1);
+  var p3=polarPoint(cx,cy,rInner,a1), p4=polarPoint(cx,cy,rInner,a0);
+  var largeArc=(a1-a0)>Math.PI?1:0;
+  return "M "+p1[0].toFixed(2)+","+p1[1].toFixed(2)+
+    " A "+rOuter+","+rOuter+" 0 "+largeArc+" 1 "+p2[0].toFixed(2)+","+p2[1].toFixed(2)+
+    " L "+p3[0].toFixed(2)+","+p3[1].toFixed(2)+
+    " A "+rInner+","+rInner+" 0 "+largeArc+" 0 "+p4[0].toFixed(2)+","+p4[1].toFixed(2)+
+    " Z";
+}
+function heatColor(count,maxCount) {
+  if(!count) return "#1f2937";
+  var t=Math.min(1,count/maxCount);
+  var stops=[[59,130,246],[251,191,36],[239,68,68]];
+  var seg=t<0.5?0:1, localT=t<0.5?t/0.5:(t-0.5)/0.5;
+  var c0=stops[seg], c1=stops[seg+1];
+  var r=Math.round(c0[0]+(c1[0]-c0[0])*localT);
+  var g=Math.round(c0[1]+(c1[1]-c0[1])*localT);
+  var b=Math.round(c0[2]+(c1[2]-c0[2])*localT);
+  return "rgb("+r+","+g+","+b+")";
+}
+function buildDartboardHeatmap(throwsList) {
+  var counts={}, maxCount=0;
+  throwsList.forEach(function(t){
+    if(!t.val) return;
+    var key=t.val+":"+t.mult;
+    counts[key]=(counts[key]||0)+1;
+    if(counts[key]>maxCount) maxCount=counts[key];
+  });
+  var svgNS="http://www.w3.org/2000/svg";
+  var svg=document.createElementNS(svgNS,"svg");
+  svg.setAttribute("viewBox","0 0 300 300");
+  svg.setAttribute("width","100%");
+  svg.style.display="block";
+  svg.style.maxWidth="320px";
+  svg.style.margin="0 auto 12px";
+  var cx=150,cy=150;
+  var rBullIn=10,rBullOut=22,rSingleA=85,rTriple=100,rSingleB=130,rDouble=145;
+  var anglePer=2*Math.PI/20;
+  DARTBOARD_ORDER.forEach(function(num,i){
+    var a0=i*anglePer-anglePer/2, a1=a0+anglePer;
+    [[rBullOut,rSingleA,1],[rSingleA,rTriple,3],[rTriple,rSingleB,1],[rSingleB,rDouble,2]].forEach(function(band){
+      var cnt=counts[num+":"+band[2]]||0;
+      var path=document.createElementNS(svgNS,"path");
+      path.setAttribute("d",annularSectorPath(cx,cy,band[0],band[1],a0,a1));
+      path.setAttribute("fill",heatColor(cnt,maxCount));
+      path.setAttribute("stroke","#030712");
+      path.setAttribute("stroke-width","0.5");
+      svg.appendChild(path);
+    });
+    var lp=polarPoint(cx,cy,rDouble+12,(a0+a1)/2);
+    var text=document.createElementNS(svgNS,"text");
+    text.setAttribute("x",lp[0]); text.setAttribute("y",lp[1]);
+    text.setAttribute("text-anchor","middle");
+    text.setAttribute("dominant-baseline","middle");
+    text.setAttribute("font-size","11");
+    text.setAttribute("fill","#9ca3af");
+    text.textContent=String(num);
+    svg.appendChild(text);
+  });
+  var outerBull=document.createElementNS(svgNS,"circle");
+  outerBull.setAttribute("cx",cx); outerBull.setAttribute("cy",cy); outerBull.setAttribute("r",rBullOut);
+  outerBull.setAttribute("fill",heatColor(counts["25:1"]||0,maxCount));
+  outerBull.setAttribute("stroke","#030712"); outerBull.setAttribute("stroke-width","0.5");
+  svg.appendChild(outerBull);
+  var innerBull=document.createElementNS(svgNS,"circle");
+  innerBull.setAttribute("cx",cx); innerBull.setAttribute("cy",cy); innerBull.setAttribute("r",rBullIn);
+  innerBull.setAttribute("fill",heatColor(counts["25:2"]||0,maxCount));
+  svg.appendChild(innerBull);
+  return svg;
+}
+
 function loadKnownNames() {
   if(!db) return;
   db.collection("matches").limit(300).get().then(function(snap){
@@ -658,13 +734,24 @@ function renderPlayerStats() {
     mpr!=null?div(null,["MPR (marques par round) : "+mpr.toFixed(2)]):null
   ]):div("rule-box",["Aucune partie Cricket dans cette ligue."]);
 
+  var myThrows=matches.reduce(function(acc,m){
+    return acc.concat((m.throws||[]).filter(function(t){return t.name===name;}));
+  },[]);
+  var missCount=myThrows.filter(function(t){return !t.val;}).length;
+  var heatBoard=myThrows.length?div(null,[
+    buildDartboardHeatmap(myThrows),
+    div("lb-split",["Basé sur "+myThrows.length+" fléchette"+(myThrows.length>1?"s":"")+" enregistrée"+(myThrows.length>1?"s":"")+(missCount?(" · "+missCount+" manquée"+(missCount>1?"s":"")):"")])
+  ]):div("rule-box",["Pas encore de données de précision pour ce joueur — cette fonctionnalité vient d'être activée, elle se remplira avec les prochaines parties."]);
+
   return div("screen",[
     header,
     div("lb-section-title",["Statistiques · "+league]),
     stats501Box,
     trend.length>1?div("lb-section-title",["Tendance moyenne 3 fléchettes"]):null,
     trend.length>1?buildSparkline(trend):null,
-    statsCrBox
+    statsCrBox,
+    div("lb-section-title",["Zones chaudes"]),
+    heatBoard
   ]);
 }
 
