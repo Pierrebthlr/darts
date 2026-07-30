@@ -84,7 +84,12 @@ var MARKS = ["","／","✕","⊗"];
 var MC = {1:"#374151",2:"#1d4ed8",3:"#b91c1c"};
 var ML = {1:"Simple",2:"Double",3:"Triple"};
 
-var state = { screen:"setup", mode:"501", names:["Joueur 1","Joueur 2"], game:null, mult:1, manualMode:false, manualVal:"" };
+var state = { screen:"setup", mode:"501", names:["Joueur 1","Joueur 2"], game:null, mult:1, manualMode:false, manualVal:"", history:[] };
+
+function pushHistory(g) {
+  state.history.push(JSON.parse(JSON.stringify(g)));
+  if(state.history.length>200) state.history.shift();
+}
 
 function init501(names) {
   return { mode:"501", players:names.map(function(n){return {name:n,score:501};}), cur:0, round:1, throws:[], phase:"game", winner:null };
@@ -100,6 +105,7 @@ function advanceTurn(g) {
 }
 function doThrow(mult,val) {
   var g=state.game;
+  pushHistory(g);
   if(g.mode==="501") {
     var pts=mult*val, p=g.players[g.cur], ts=g.throws.concat([{mult:mult,val:val,pts:pts}]);
     var left=p.score-pts, bust=left<0||left===1, win=left===0&&mult===2;
@@ -130,7 +136,9 @@ function doThrow(mult,val) {
   state.mult=1; render();
 }
 function doManualScore(pts) {
-  var g=state.game, p=g.players[g.cur];
+  var g=state.game;
+  pushHistory(g);
+  var p=g.players[g.cur];
   var left=p.score-pts, bust=left<0||left===1, win=left===0;
   var players=g.players.map(function(pl,i){
     if(i!==g.cur) return pl;
@@ -141,17 +149,9 @@ function doManualScore(pts) {
   state.manualMode=false; state.manualVal=""; state.mult=1; render();
 }
 function doUndo() {
-  var g=state.game; if(!g.throws.length) return;
-  var last=g.throws[g.throws.length-1];
-  var players=g.players.map(function(p,i){
-    if(i!==g.cur) return p;
-    var np=Object.assign({},p,{score:p.score-last.pts});
-    if(g.mode==="cricket"&&CRICKET_NUMS.indexOf(last.val)>=0){
-      var m=Object.assign({},p.marks); m[last.val]=Math.max(0,(m[last.val]||0)-last.mult); np.marks=m;
-    }
-    return np;
-  });
-  state.game=Object.assign({},g,{players:players,throws:g.throws.slice(0,-1)}); render();
+  if(!state.history.length) return;
+  state.game=state.history.pop();
+  state.manualMode=false; state.manualVal=""; state.mult=1; render();
 }
 
 function el(tag,attrs,children) {
@@ -192,7 +192,7 @@ function renderSetup() {
     btn("start-btn","Commencer",function(){
       var names=s.names.filter(function(n){return n.trim();});
       state.game=s.mode==="501"?init501(names):initCricket(names);
-      state.screen="game";state.mult=1;render();
+      state.screen="game";state.mult=1;state.history=[];render();
     })
   ]);
 }
@@ -252,7 +252,7 @@ function renderGame() {
   }).concat([btn("miss-btn","Miss 0",function(){doThrow(1,0);})]));
   var actionRow=div("action-row",[
     btn("action-btn","↩ Annuler",function(){doUndo();}),
-    btn("action-btn","⏭ Passer",function(){state.game=advanceTurn(Object.assign({},g,{throws:[]}));state.mult=1;render();})
+    btn("action-btn","⏭ Passer",function(){pushHistory(g);state.game=advanceTurn(Object.assign({},g,{throws:[]}));state.mult=1;render();})
   ]);
   return div("screen",[
     div("g-header",[el("span",{},[g.mode==="501"?"🎯 501":"🦗 Cricket"]),btn("quit-btn","✕ Quitter",function(){state.game=null;state.screen="setup";render();})]),
@@ -269,10 +269,11 @@ function renderWin() {
     btn("win-btn primary","🔄 Rejouer",function(){
       var names=g.players.map(function(p){return p.name;});
       state.game=g.mode==="501"?init501(names):initCricket(names);
-      state.screen="game";state.mult=1;render();
+      state.screen="game";state.mult=1;state.history=[];render();
     }),
     el("br"),
-    btn("win-btn secondary","✏️ Nouvelle config",function(){state.game=null;state.screen="setup";render();})
+    btn("win-btn secondary","✏️ Nouvelle config",function(){state.game=null;state.screen="setup";render();}),
+    state.history.length?btn("manual-toggle","↩ C'était une erreur, annuler",function(){doUndo();}):null
   ]);
 }
 
