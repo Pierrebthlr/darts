@@ -122,6 +122,7 @@ try {
 function recordMatch(g) {
   if(!db) return;
   db.collection("matches").add({
+    league: g.league||"Général",
     mode: g.mode,
     cutthroat: !!g.cutthroat,
     players: g.players.map(function(p){ return {name:p.name, score:p.score, darts:p.darts||0}; }),
@@ -172,7 +173,22 @@ function formatDart(d) {
   return (d.mult===3?"T":d.mult===2?"D":"S")+d.val;
 }
 
-var state = { screen:"setup", mode:"501", names:["Joueur 1","Joueur 2"], game:null, mult:1, manualMode:false, manualVal:"", history:[], bullHit:null, cutthroat:false, leaderboard:null };
+var state = { screen:"setup", mode:"501", names:["Joueur 1","Joueur 2"], league:"", game:null, mult:1, manualMode:false, manualVal:"", history:[], bullHit:null, cutthroat:false, leaderboard:null, knownNames:[], knownLeagues:[] };
+
+function loadKnownNames() {
+  if(!db) return;
+  db.collection("matches").limit(300).get().then(function(snap){
+    var names={}, leagues={};
+    snap.docs.forEach(function(d){
+      var data=d.data();
+      (data.players||[]).forEach(function(p){ if(p.name) names[p.name]=true; });
+      leagues[data.league||"Général"]=true;
+    });
+    state.knownNames=Object.keys(names).sort();
+    state.knownLeagues=Object.keys(leagues).sort();
+    render();
+  }).catch(function(e){ console.error("loadKnownNames failed",e); });
+}
 
 function loadLeaderboard() {
   state.leaderboard={loading:true,matches:null,error:null};
@@ -239,11 +255,11 @@ function pushHistory(g) {
   if(state.history.length>200) state.history.shift();
 }
 
-function init501(names) {
-  return { mode:"501", players:names.map(function(n){return {name:n,score:501,darts:0};}), cur:0, round:1, throws:[], phase:"game", winner:null };
+function init501(names,league) {
+  return { mode:"501", league:league||"Général", players:names.map(function(n){return {name:n,score:501,darts:0};}), cur:0, round:1, throws:[], phase:"game", winner:null };
 }
-function initCricket(names,cutthroat) {
-  return { mode:"cricket", cutthroat:!!cutthroat, players:names.map(function(n){
+function initCricket(names,cutthroat,league) {
+  return { mode:"cricket", cutthroat:!!cutthroat, league:league||"Général", players:names.map(function(n){
     var m={}; CRICKET_NUMS.forEach(function(x){m[x]=0;}); return {name:n,score:0,marks:m,darts:0};
   }), cur:0, round:1, throws:[], phase:"game", winner:null };
 }
@@ -316,6 +332,7 @@ function el(tag,attrs,children) {
     if(k==="onclick") e.addEventListener("click",attrs[k]);
     else if(k==="oninput") e.addEventListener("input",attrs[k]);
     else if(k==="style"&&typeof attrs[k]==="object") Object.assign(e.style,attrs[k]);
+    else if(k==="list") e.setAttribute("list",attrs[k]);
     else e[k]=attrs[k];
   });
   if(children)(Array.isArray(children)?children:[children]).forEach(function(c){
@@ -331,10 +348,15 @@ function renderSetup() {
   var s=state;
   var nameInputs=s.names.map(function(n,i){
     return div("player-row",[
-      el("input",{type:"text",value:n,oninput:function(e){s.names[i]=e.target.value;}}),
+      el("input",{type:"text",value:n,list:"known-players",oninput:function(e){s.names[i]=e.target.value;}}),
       btn("rm-btn","✕",function(){if(s.names.length>1){s.names.splice(i,1);render();}})
     ]);
   });
+  var knownNamesList=el("datalist",{id:"known-players"},state.knownNames.map(function(n){return el("option",{value:n});}));
+  var knownLeaguesList=el("datalist",{id:"known-leagues"},state.knownLeagues.map(function(n){return el("option",{value:n});}));
+  var leagueRow=div("player-row",[
+    el("input",{type:"text",value:s.league,list:"known-leagues",placeholder:"Ligue (ex : Amis, Travail)",oninput:function(e){s.league=e.target.value;}})
+  ]);
   var ruleBox=s.mode==="cricket"?div("rule-box",[s.cutthroat
     ?"☠️ Cutthroat : fermez 15–20 et Bull (3 touches chacun). Vos points en trop sont infligés aux adversaires qui n'ont pas fermé le numéro. Gagne celui qui ferme tout avec le score le plus BAS."
     :"Fermez 15–20 et Bull (3 touches chacun). Marquez des points sur vos numéros fermés tant que l'adversaire ne les a pas fermés. Gagne celui qui ferme tout avec le score le plus haut."
@@ -351,16 +373,22 @@ function renderSetup() {
       btn("mode-btn"+(s.mode==="501"?" active":""),"🎯 501",function(){s.mode="501";render();}),
       btn("mode-btn"+(s.mode==="cricket"?" active":""),"🦗 Cricket",function(){s.mode="cricket";render();})
     ]),
+    leagueRow,
     cutthroatToggle,
     ruleBox,
     div(null,nameInputs),
     s.names.length<6?btn("add-btn","+ Ajouter un joueur",function(){s.names.push("Joueur "+(s.names.length+1));render();}):null,
     btn("start-btn","Commencer",function(){
       var names=s.names.filter(function(n){return n.trim();});
-      state.game=s.mode==="501"?init501(names):initCricket(names,s.cutthroat);
+      var league=(s.league||"").trim()||"Général";
+      if(state.knownLeagues.indexOf(league)<0) state.knownLeagues.push(league);
+      names.forEach(function(n){ if(state.knownNames.indexOf(n)<0) state.knownNames.push(n); });
+      state.game=s.mode==="501"?init501(names,league):initCricket(names,s.cutthroat,league);
       state.screen="game";state.mult=1;state.history=[];render();
     }),
-    btn("win-btn secondary","🏆 Classement",function(){state.leaderboard=null;state.screen="leaderboard";render();})
+    btn("win-btn secondary","🏆 Classement",function(){state.leaderboard=null;state.screen="leaderboard";render();}),
+    knownNamesList,
+    knownLeaguesList
   ]);
 }
 
@@ -447,7 +475,7 @@ function renderWin() {
     el("p",{},[" a gagné la partie de "+(g.mode==="501"?"501":"Cricket")+" !"]),
     btn("win-btn primary","🔄 Rejouer",function(){
       var names=g.players.map(function(p){return p.name;});
-      state.game=g.mode==="501"?init501(names):initCricket(names,g.cutthroat);
+      state.game=g.mode==="501"?init501(names,g.league):initCricket(names,g.cutthroat,g.league);
       state.screen="game";state.mult=1;state.history=[];render();
     }),
     el("br"),
@@ -462,8 +490,17 @@ function renderLeaderboard() {
   var lb=state.leaderboard;
   if(!lb||lb.loading) return div("screen",[header,div("rule-box",["Chargement…"])]);
   if(lb.error) return div("screen",[header,div("rule-box",["Erreur de chargement : "+lb.error])]);
-  var matches=lb.matches;
-  if(!matches.length) return div("screen",[header,div("rule-box",["Aucune partie enregistrée pour l'instant."])]);
+  var allMatches=lb.matches;
+  if(!allMatches.length) return div("screen",[header,div("rule-box",["Aucune partie enregistrée pour l'instant."])]);
+
+  var leagues=[];
+  allMatches.forEach(function(m){ var l=m.league||"Général"; if(leagues.indexOf(l)<0) leagues.push(l); });
+  leagues.sort();
+  if(!lb.selectedLeague||leagues.indexOf(lb.selectedLeague)<0) lb.selectedLeague=allMatches[0].league||"Général";
+  var leagueSwitcher=leagues.length>1?div("mode-row",leagues.map(function(l){
+    return btn("mode-btn"+(l===lb.selectedLeague?" active":""),l,function(){lb.selectedLeague=l;render();});
+  })):null;
+  var matches=allMatches.filter(function(m){ return (m.league||"Général")===lb.selectedLeague; });
 
   var wins={}, bestCheckout501=null, bestCheckoutCricket=null;
   matches.forEach(function(m){
@@ -497,7 +534,8 @@ function renderLeaderboard() {
 
   return div("screen",[
     header,
-    div("lb-section-title",["Classement général"]),
+    leagueSwitcher,
+    div("lb-section-title",["Classement général"+" · "+lb.selectedLeague]),
     rankRows,
     records?div("lb-section-title",["Records"]):null,
     records,
@@ -513,6 +551,7 @@ function render() {
   app.appendChild(state.screen==="setup"?renderSetup():state.screen==="leaderboard"?renderLeaderboard():g&&g.phase==="won"?renderWin():renderGame());
 }
 fxResize();
+loadKnownNames();
 render();
 </script>
 </body>
