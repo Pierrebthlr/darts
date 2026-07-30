@@ -63,8 +63,8 @@ export function buildHeatboardData(throwsList: { val: number; mult: number }[]):
     if (counts[key] > maxCount) maxCount = counts[key];
   });
 
-  const cx = 150;
-  const cy = 150;
+  const cx = 175;
+  const cy = 175;
   const rBullIn = 10;
   const rBullOut = 22;
   const rSingleA = 85;

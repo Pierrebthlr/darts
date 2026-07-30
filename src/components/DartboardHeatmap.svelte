@@ -7,7 +7,7 @@
   $: data = buildHeatboardData(throwsList);
 </script>
 
-<svg viewBox="0 0 300 300" width="100%" style="display:block;max-width:320px;margin:0 auto 12px;">
+<svg viewBox="0 0 350 350" width="100%" style="display:block;max-width:320px;margin:0 auto 12px;">
   {#each data.bands as band}
     <path d={band.d} fill={band.fill} stroke="#030712" stroke-width="0.5" />
   {/each}
