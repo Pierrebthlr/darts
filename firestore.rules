@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /matches/{matchId} {
+      allow read: if true;
+      allow create: if
+        request.resource.data.keys().hasAll(['league','mode','cutthroat','players','winnerName','winnerDarts','createdAt'])
+        && request.resource.data.league is string
+        && request.resource.data.league.size() > 0
+        && request.resource.data.league.size() < 60
+        && request.resource.data.mode is string
+        && request.resource.data.mode in ['501','cricket']
+        && request.resource.data.cutthroat is bool
+        && request.resource.data.players is list
+        && request.resource.data.players.size() >= 2
+        && request.resource.data.players.size() <= 8
+        && request.resource.data.winnerName is string
+        && request.resource.data.winnerName.size() < 60
+        && request.resource.data.winnerDarts is int
+        && request.resource.data.winnerDarts >= 0
+        && request.resource.data.winnerDarts <= 500
+        && (!('winnerCheckout' in request.resource.data) || request.resource.data.winnerCheckout == null || (request.resource.data.winnerCheckout is int && request.resource.data.winnerCheckout >= 0 && request.resource.data.winnerCheckout <= 170))
+        && (!('throws' in request.resource.data) || (request.resource.data.throws is list && request.resource.data.throws.size() <= 1000));
+      allow update, delete: if false;
+    }
+  }
+}
