@@ -3,7 +3,7 @@
   button { cursor: pointer; font-family: inherit; }
   .screen { max-width: 460px; margin: 0 auto; padding: 14px 12px 32px; }
   .logo { text-align: center; padding: 10px 0 18px; }
-  .logo img { width: 440px; height: 440px; max-width: 100%; object-fit: contain; }
+  .logo img { width: 440px; max-width: 100%; height: auto; }
   .logo div { font-size: 44px; }
   .logo h1 { font-size: 26px; color: #f9fafb; margin-top: 4px; }
   .mode-row { display: flex; gap: 8px; margin-bottom: 14px; }
