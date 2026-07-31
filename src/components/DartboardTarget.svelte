@@ -6,9 +6,19 @@
 
   const data = buildTargetZones();
 
+  let hoveredLabel: string | null = null;
+
   function zoneLabel(val: number, mult: number): string {
     if (val === 25) return mult === 2 ? 'Bull double' : 'Bull';
     return `${MULT_LABEL[mult]} ${val}`;
+  }
+
+  function preview(val: number, mult: number) {
+    hoveredLabel = zoneLabel(val, mult);
+  }
+
+  function clearPreview() {
+    hoveredLabel = null;
   }
 
   function fire(e: MouseEvent | KeyboardEvent, val: number, mult: number) {
@@ -17,7 +27,7 @@
   }
 </script>
 
-<svg viewBox="0 0 350 350" width="100%" style="display:block;max-width:320px;margin:0 auto 12px;touch-action:manipulation;">
+<svg viewBox="0 0 350 350" width="100%" style="display:block;max-width:320px;margin:0 auto 8px;touch-action:manipulation;">
   {#each data.bands as band}
     <path
       d={band.d}
@@ -28,6 +38,10 @@
       role="button"
       tabindex="0"
       aria-label={zoneLabel(band.val, band.mult)}
+      on:pointerenter={() => preview(band.val, band.mult)}
+      on:pointerleave={clearPreview}
+      on:focus={() => preview(band.val, band.mult)}
+      on:blur={clearPreview}
       on:click={(e) => fire(e, band.val, band.mult)}
       on:keypress={(e) => fire(e, band.val, band.mult)}
     />
@@ -43,6 +57,10 @@
     role="button"
     tabindex="0"
     aria-label={zoneLabel(25, 1)}
+    on:pointerenter={() => preview(25, 1)}
+    on:pointerleave={clearPreview}
+    on:focus={() => preview(25, 1)}
+    on:blur={clearPreview}
     on:click={(e) => fire(e, 25, 1)}
     on:keypress={(e) => fire(e, 25, 1)}
   />
@@ -55,6 +73,10 @@
     role="button"
     tabindex="0"
     aria-label={zoneLabel(25, 2)}
+    on:pointerenter={() => preview(25, 2)}
+    on:pointerleave={clearPreview}
+    on:focus={() => preview(25, 2)}
+    on:blur={clearPreview}
     on:click={(e) => fire(e, 25, 2)}
     on:keypress={(e) => fire(e, 25, 2)}
   />
@@ -62,3 +84,19 @@
     <text x={label.x} y={label.y} text-anchor="middle" dominant-baseline="middle" font-size="11" fill="#9ca3af">{label.text}</text>
   {/each}
 </svg>
+
+<div class="target-caption" class:active={!!hoveredLabel}>{hoveredLabel ?? 'Survolez ou touchez une zone pour viser'}</div>
+
+<style>
+  .target-caption {
+    text-align: center;
+    font-size: 12px;
+    color: #6b7280;
+    min-height: 1.4em;
+    margin: -4px 0 12px;
+  }
+  .target-caption.active {
+    color: #e5e7eb;
+    font-weight: bold;
+  }
+</style>
