@@ -61,6 +61,7 @@
   .num-btn.bull { color: #fbbf24; }
   .num-btn.bull.disabled { opacity: .35; cursor: not-allowed; }
   .miss-btn { grid-column: span 2; padding: 10px 0; border-radius: 6px; border: 1px dashed #4b5563; background: #1f2937; color: #e5e7eb; font-size: 13px; font-weight: bold; }
+  .miss-btn-solo { display: block; width: 100%; max-width: 320px; margin: 0 auto 8px; padding: 10px 0; border-radius: 6px; border: 1px dashed #4b5563; background: #1f2937; color: #e5e7eb; font-size: 13px; font-weight: bold; }
   .action-row { display: flex; gap: 6px; }
   .action-btn { flex: 1; padding: 10px 0; border-radius: 8px; border: none; background: #374151; color: #f9fafb; font-size: 14px; }
   .win-screen { text-align: center; padding: 40px 20px; max-width: 400px; margin: 0 auto; }

@@ -1,5 +1,16 @@
 export const DARTBOARD_ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
 
+export const BOARD_GEOMETRY = {
+  cx: 175,
+  cy: 175,
+  rBullIn: 10,
+  rBullOut: 22,
+  rSingleA: 85,
+  rTriple: 100,
+  rSingleB: 130,
+  rDouble: 145
+};
+
 export function polarPoint(cx: number, cy: number, r: number, angle: number): [number, number] {
   return [cx + r * Math.sin(angle), cy - r * Math.cos(angle)];
 }
@@ -69,14 +80,7 @@ export function buildHeatboardData(throwsList: { val: number; mult: number }[]):
     if (counts[key] > maxCount) maxCount = counts[key];
   });
 
-  const cx = 175;
-  const cy = 175;
-  const rBullIn = 10;
-  const rBullOut = 22;
-  const rSingleA = 85;
-  const rTriple = 100;
-  const rSingleB = 130;
-  const rDouble = 145;
+  const { cx, cy, rBullIn, rBullOut, rSingleA, rTriple, rSingleB, rDouble } = BOARD_GEOMETRY;
   const anglePer = (2 * Math.PI) / 20;
   const bands: HeatBand[] = [];
   const labels: HeatLabel[] = [];
@@ -110,5 +114,65 @@ export function buildHeatboardData(throwsList: { val: number; mult: number }[]):
     rBullIn,
     rBullOut,
     total: throwsList.reduce((n, t) => n + (t.val ? 1 : 0), 0)
+  };
+}
+
+export interface TargetBand {
+  d: string;
+  fill: string;
+  val: number;
+  mult: number;
+}
+
+export interface TargetData {
+  bands: TargetBand[];
+  labels: HeatLabel[];
+  outerBullFill: string;
+  innerBullFill: string;
+  cx: number;
+  cy: number;
+  rBullIn: number;
+  rBullOut: number;
+}
+
+const SECTOR_DARK = '#1f2937';
+const SECTOR_LIGHT = '#374151';
+const RING_RED = '#b91c1c';
+const RING_GREEN = '#15803d';
+
+export function buildTargetZones(): TargetData {
+  const { cx, cy, rBullIn, rBullOut, rSingleA, rTriple, rSingleB, rDouble } = BOARD_GEOMETRY;
+  const anglePer = (2 * Math.PI) / 20;
+  const bands: TargetBand[] = [];
+  const labels: HeatLabel[] = [];
+
+  DARTBOARD_ORDER.forEach((num, i) => {
+    const a0 = i * anglePer - anglePer / 2;
+    const a1 = a0 + anglePer;
+    const alt = i % 2 === 0;
+    const singleFill = alt ? SECTOR_DARK : SECTOR_LIGHT;
+    const ringFill = alt ? RING_RED : RING_GREEN;
+    const ringDefs: [number, number, number, string][] = [
+      [rBullOut, rSingleA, 1, singleFill],
+      [rSingleA, rTriple, 3, ringFill],
+      [rTriple, rSingleB, 1, singleFill],
+      [rSingleB, rDouble, 2, ringFill]
+    ];
+    ringDefs.forEach(([rIn, rOut, mult, fill]) => {
+      bands.push({ d: annularSectorPath(cx, cy, rIn, rOut, a0, a1), fill, val: num, mult });
+    });
+    const [lx, ly] = polarPoint(cx, cy, rDouble + 12, (a0 + a1) / 2);
+    labels.push({ x: lx, y: ly, text: String(num) });
+  });
+
+  return {
+    bands,
+    labels,
+    outerBullFill: RING_GREEN,
+    innerBullFill: RING_RED,
+    cx,
+    cy,
+    rBullIn,
+    rBullOut
   };
 }

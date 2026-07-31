@@ -18,7 +18,7 @@ export interface AppState {
   cutthroat: boolean;
   game: GameState | null;
   mult: number;
-  manualMode: boolean;
+  inputMode: 'buttons' | 'target' | 'manual';
   manualVal: string;
   history: GameState[];
   leaderboard: LeaderboardState | null;
@@ -36,7 +36,7 @@ function initialState(): AppState {
     cutthroat: false,
     game: null,
     mult: 1,
-    manualMode: false,
+    inputMode: 'buttons',
     manualVal: '',
     history: [],
     leaderboard: null,

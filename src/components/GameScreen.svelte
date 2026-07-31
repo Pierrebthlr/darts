@@ -4,6 +4,7 @@
   import { findCheckout, formatDart } from '../lib/checkout';
   import { triggerBullEffect, trigger180Effect, toast } from '../lib/celebrations';
   import { recordMatch } from '../lib/firebase';
+  import DartboardTarget from './DartboardTarget.svelte';
   import type { GameState } from '../lib/types';
 
   $: g = $app.game as GameState;
@@ -32,7 +33,7 @@
   function undo() {
     const prev = popHistory();
     if (!prev) return;
-    app.update((s) => ({ ...s, game: prev, manualMode: false, manualVal: '', mult: 1 }));
+    app.update((s) => ({ ...s, game: prev, inputMode: 'buttons', manualVal: '', mult: 1 }));
   }
 
   function confirmManual() {
@@ -45,16 +46,32 @@
     const result = applyManualScore(g, pts);
     if (result.scored180) trigger180Effect(window.innerWidth / 2, window.innerHeight / 2);
     if (result.matchWon) recordMatch(result.next);
-    app.update((s) => ({ ...s, game: result.next, manualMode: false, manualVal: '', mult: 1 }));
+    app.update((s) => ({ ...s, game: result.next, inputMode: 'buttons', manualVal: '', mult: 1 }));
   }
 
   function quit() {
     app.update((s) => ({ ...s, game: null, screen: 'setup' }));
   }
 
+  // Manual round-score entry replaces the whole round at once, so switching into it
+  // must undo any darts already thrown this turn via buttons/target — otherwise their
+  // score effect would double up with the manual total.
+  function setInputMode(mode: 'buttons' | 'target' | 'manual') {
+    if (mode === $app.inputMode) return;
+    let game = g;
+    if (mode === 'manual' && g.throws.length) {
+      for (let i = 0; i < g.throws.length; i++) {
+        const prev = popHistory();
+        if (prev) game = prev;
+      }
+    }
+    app.update((s) => ({ ...s, game, inputMode: mode, manualVal: '', mult: 1 }));
+  }
+
   $: dartsLeft = g.mode === '501' ? 3 - g.throws.length : 0;
   $: checkoutSeq = g.mode === '501' && dartsLeft > 0 ? findCheckout(p.score, dartsLeft) : null;
   $: modeLabel = g.mode === '501' ? '🎯 501' : g.cutthroat ? '☠️ Cutthroat' : '🦗 Cricket';
+  $: effectiveInputMode = g.mode === 'cricket' && $app.inputMode === 'manual' ? 'buttons' : $app.inputMode;
 </script>
 
 <div class="screen">
@@ -116,7 +133,15 @@
     {/if}
   </div>
 
-  {#if g.mode === '501' && $app.manualMode}
+  <div class="mode-row">
+    <button class="mode-btn" class:active={effectiveInputMode === 'buttons'} on:click={() => setInputMode('buttons')}>🔢 Boutons</button>
+    <button class="mode-btn" class:active={effectiveInputMode === 'target'} on:click={() => setInputMode('target')}>🎯 Cible</button>
+    {#if g.mode === '501'}
+      <button class="mode-btn" class:active={effectiveInputMode === 'manual'} on:click={() => setInputMode('manual')}>✏️ Manuel</button>
+    {/if}
+  </div>
+
+  {#if effectiveInputMode === 'manual'}
     <input
       class="manual-input"
       type="number"
@@ -125,18 +150,7 @@
       bind:value={$app.manualVal}
     />
     <button class="win-btn primary" on:click={confirmManual}>✓ Valider</button>
-    <button
-      class="win-btn secondary"
-      on:click={() => app.update((s) => ({ ...s, manualMode: false, manualVal: '' }))}
-    >← Revenir aux fléchettes</button>
   {:else}
-    {#if g.mode === '501' && g.throws.length === 0}
-      <button
-        class="manual-toggle"
-        on:click={() => app.update((s) => ({ ...s, manualMode: true, manualVal: '' }))}
-      >✏️ Entrer le score du round</button>
-    {/if}
-
     <div class="slots">
       {#each [0, 1, 2] as i}
         {@const t = g.throws[i]}
@@ -152,43 +166,48 @@
       {/each}
     </div>
 
-    <div class="mult-row">
-      {#each [1, 2, 3] as m}
-        <button
-          class="mult-btn"
-          style="background:{$app.mult === m ? MULT_COLOR[m] : '#1f2937'}"
-          on:click={() => app.update((s) => ({ ...s, mult: m }))}
-        >{MULT_LABEL[m]}</button>
-      {/each}
-    </div>
+    {#if effectiveInputMode === 'buttons'}
+      <div class="mult-row">
+        {#each [1, 2, 3] as m}
+          <button
+            class="mult-btn"
+            style="background:{$app.mult === m ? MULT_COLOR[m] : '#1f2937'}"
+            on:click={() => app.update((s) => ({ ...s, mult: m }))}
+          >{MULT_LABEL[m]}</button>
+        {/each}
+      </div>
 
-    <div class="num-grid">
-      {#each ALL_NUMS as n}
-        {@const isCr = g.mode === 'cricket' && CRICKET_NUMS.indexOf(n) >= 0}
-        {@const isBull = n === 25}
-        {@const bullDisabled = isBull && $app.mult === 3}
-        {@const isHit = $toast != null && $toast.val === n && (isBull ? $toast.kind === 'bull' : n === 20 && $toast.kind === '180')}
-        <button
-          class="num-btn"
-          class:cricket-target={isCr}
-          class:bull={isBull}
-          class:hit={isBull && isHit}
-          class:hit180={n === 20 && isHit}
-          class:disabled={bullDisabled}
-          disabled={bullDisabled}
-          on:click={(e) => onNumClick(e, n)}
-        >{isBull ? 'Bull' : n}</button>
-      {/each}
-      <button class="miss-btn" on:click={() => throwDart(1, 0)}>Miss 0</button>
-    </div>
-
-    <div class="action-row">
-      <button class="action-btn" on:click={undo}>↩ Annuler</button>
-      <button class="action-btn" on:click={pass}>⏭ Passer</button>
-    </div>
-
-    {#if $toast}
-      <div class="fx-toast" class:toast-180={$toast.kind === '180'}>{$toast.label}</div>
+      <div class="num-grid">
+        {#each ALL_NUMS as n}
+          {@const isCr = g.mode === 'cricket' && CRICKET_NUMS.indexOf(n) >= 0}
+          {@const isBull = n === 25}
+          {@const bullDisabled = isBull && $app.mult === 3}
+          {@const isHit = $toast != null && $toast.val === n && (isBull ? $toast.kind === 'bull' : n === 20 && $toast.kind === '180')}
+          <button
+            class="num-btn"
+            class:cricket-target={isCr}
+            class:bull={isBull}
+            class:hit={isBull && isHit}
+            class:hit180={n === 20 && isHit}
+            class:disabled={bullDisabled}
+            disabled={bullDisabled}
+            on:click={(e) => onNumClick(e, n)}
+          >{isBull ? 'Bull' : n}</button>
+        {/each}
+        <button class="miss-btn" on:click={() => throwDart(1, 0)}>Miss 0</button>
+      </div>
+    {:else}
+      <DartboardTarget onThrow={throwDart} />
+      <button class="miss-btn-solo" on:click={() => throwDart(1, 0)}>Miss 0</button>
     {/if}
+  {/if}
+
+  <div class="action-row">
+    <button class="action-btn" on:click={undo}>↩ Annuler</button>
+    <button class="action-btn" on:click={pass}>⏭ Passer</button>
+  </div>
+
+  {#if $toast}
+    <div class="fx-toast" class:toast-180={$toast.kind === '180'}>{$toast.label}</div>
   {/if}
 </div>

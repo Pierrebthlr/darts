@@ -19,7 +19,7 @@
   function undoWin() {
     const prev = popHistory();
     if (!prev) return;
-    app.update((s) => ({ ...s, game: prev, manualMode: false, manualVal: '', mult: 1 }));
+    app.update((s) => ({ ...s, game: prev, inputMode: 'buttons', manualVal: '', mult: 1 }));
   }
 </script>
 
