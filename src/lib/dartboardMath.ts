@@ -34,6 +34,9 @@ export function heatColor(count: number, maxCount: number): string {
 export interface HeatBand {
   d: string;
   fill: string;
+  val: number;
+  mult: number;
+  count: number;
 }
 
 export interface HeatLabel {
@@ -47,10 +50,13 @@ export interface HeatboardData {
   labels: HeatLabel[];
   outerBullFill: string;
   innerBullFill: string;
+  outerBullCount: number;
+  innerBullCount: number;
   cx: number;
   cy: number;
   rBullIn: number;
   rBullOut: number;
+  total: number;
 }
 
 export function buildHeatboardData(throwsList: { val: number; mult: number }[]): HeatboardData {
@@ -86,7 +92,7 @@ export function buildHeatboardData(throwsList: { val: number; mult: number }[]):
     ];
     ringDefs.forEach(([rIn, rOut, mult]) => {
       const cnt = counts[`${num}:${mult}`] || 0;
-      bands.push({ d: annularSectorPath(cx, cy, rIn, rOut, a0, a1), fill: heatColor(cnt, maxCount) });
+      bands.push({ d: annularSectorPath(cx, cy, rIn, rOut, a0, a1), fill: heatColor(cnt, maxCount), val: num, mult, count: cnt });
     });
     const [lx, ly] = polarPoint(cx, cy, rDouble + 12, (a0 + a1) / 2);
     labels.push({ x: lx, y: ly, text: String(num) });
@@ -97,9 +103,12 @@ export function buildHeatboardData(throwsList: { val: number; mult: number }[]):
     labels,
     outerBullFill: heatColor(counts['25:1'] || 0, maxCount),
     innerBullFill: heatColor(counts['25:2'] || 0, maxCount),
+    outerBullCount: counts['25:1'] || 0,
+    innerBullCount: counts['25:2'] || 0,
     cx,
     cy,
     rBullIn,
-    rBullOut
+    rBullOut,
+    total: throwsList.reduce((n, t) => n + (t.val ? 1 : 0), 0)
   };
 }
