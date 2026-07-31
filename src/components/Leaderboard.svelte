@@ -54,20 +54,25 @@
   $: matches = allMatches.filter((m: any) => (m.league || 'Général') === selectedLeague);
 
   $: aggregation = (() => {
-    const wins: Record<string, { total: number; '501': number; cricket: number; cutthroat: number }> = {};
+    const wins: Record<string, { total: number; played: number; '501': number; cricket: number; cutthroat: number }> = {};
+    function ensure(name: string) {
+      if (!wins[name]) wins[name] = { total: 0, played: 0, '501': 0, cricket: 0, cutthroat: 0 };
+      return wins[name];
+    }
     let bestCheckout501: any = null;
     let bestCheckoutCricket: any = null;
     matches.forEach((m: any) => {
       const key = m.mode === 'cricket' && m.cutthroat ? 'cutthroat' : m.mode;
-      if (!wins[m.winnerName]) wins[m.winnerName] = { total: 0, '501': 0, cricket: 0, cutthroat: 0 };
-      wins[m.winnerName].total++;
-      (wins[m.winnerName] as any)[key] = ((wins[m.winnerName] as any)[key] || 0) + 1;
+      m.players.forEach((p: any) => ensure(p.name).played++);
+      const winner = ensure(m.winnerName);
+      winner.total++;
+      (winner as any)[key] = ((winner as any)[key] || 0) + 1;
       if (m.mode === '501' && m.winnerDarts > 0 && (!bestCheckout501 || m.winnerDarts < bestCheckout501.winnerDarts)) bestCheckout501 = m;
       if (m.mode === 'cricket' && m.winnerDarts > 0 && (!bestCheckoutCricket || m.winnerDarts < bestCheckoutCricket.winnerDarts)) bestCheckoutCricket = m;
     });
     const ranking = Object.keys(wins)
       .map((name) => ({ name, ...wins[name] }))
-      .sort((a, b) => b.total - a.total);
+      .sort((a, b) => b.total - a.total || b.played - a.played);
     return { ranking, bestCheckout501, bestCheckoutCricket };
   })();
 
@@ -136,7 +141,7 @@
             <div class="lb-name">{r.name}</div>
             <div class="lb-wins">{r.total} 🏆</div>
           </div>
-          <div class="lb-split">501 : {r['501']} · Cricket : {r.cricket}{r.cutthroat ? ` · Cutthroat : ${r.cutthroat}` : ''}</div>
+          <div class="lb-split">{r.played} partie{r.played > 1 ? 's' : ''} jouée{r.played > 1 ? 's' : ''} · 501 : {r['501']} · Cricket : {r.cricket}{r.cutthroat ? ` · Cutthroat : ${r.cutthroat}` : ''}</div>
         </div>
       {/each}
     </div>
