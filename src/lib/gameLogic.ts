@@ -17,7 +17,8 @@ export function init501(names: string[], league: string): GameState {
     throws: [],
     dartLog: [],
     phase: 'game',
-    winner: null
+    winner: null,
+    lastTurn: null
   };
 }
 
@@ -36,7 +37,8 @@ export function initCricket(names: string[], cutthroat: boolean, league: string)
     throws: [],
     dartLog: [],
     phase: 'game',
-    winner: null
+    winner: null,
+    lastTurn: null
   };
 }
 
@@ -72,8 +74,12 @@ export function applyThrow(g: GameState, mult: number, val: number): ThrowResult
       const next = { ...g, players, phase: 'won' as const, winner: g.cur, throws: ts, dartLog, winnerCheckout: p.score };
       return { next, bullHit, scored180, matchWon: true };
     }
-    const merged = { ...g, players, throws: ts, dartLog };
-    const next = bust || ts.length === 3 ? advanceTurn(merged) : merged;
+    const turnOver = bust || ts.length === 3;
+    const lastTurn = turnOver
+      ? { name: p.name, throws: ts, pts: ts.reduce((s, t) => s + t.pts, 0), scoreAfter: players[g.cur].score, busted: bust }
+      : g.lastTurn;
+    const merged = { ...g, players, throws: ts, dartLog, lastTurn };
+    const next = turnOver ? advanceTurn(merged) : merged;
     return { next, bullHit, scored180, matchWon: false };
   }
 
@@ -113,7 +119,10 @@ export function applyThrow(g: GameState, mult: number, val: number): ThrowResult
     players[g.cur].darts = (players[g.cur].darts || 0) + 1;
   }
 
-  const merged = { ...g, players, throws: ts, dartLog };
+  const lastTurn = ts.length === 3
+    ? { name: players[g.cur].name, throws: ts, pts: ts.reduce((s, t) => s + t.pts, 0), scoreAfter: players[g.cur].score, busted: false }
+    : g.lastTurn;
+  const merged = { ...g, players, throws: ts, dartLog, lastTurn };
   const next = ts.length === 3 ? advanceTurn(merged) : merged;
   return { next, bullHit, scored180: false, matchWon: false };
 }
@@ -132,5 +141,6 @@ export function applyManualScore(g: GameState, pts: number): ThrowResult {
     const next = { ...g, players, phase: 'won' as const, winner: g.cur, throws: [], winnerCheckout: p.score };
     return { next, bullHit: false, scored180, matchWon: true };
   }
-  return { next: advanceTurn({ ...g, players, throws: [] }), bullHit: false, scored180, matchWon: false };
+  const lastTurn = { name: p.name, throws: [], pts, scoreAfter: bust ? p.score : left, busted: bust };
+  return { next: advanceTurn({ ...g, players, throws: [], lastTurn }), bullHit: false, scored180, matchWon: false };
 }

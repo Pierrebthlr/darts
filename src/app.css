@@ -45,6 +45,9 @@
   .turn-hint { text-align: center; color: #9ca3af; font-size: 12px; margin-bottom: 8px; }
   .turn-hint b { color: #60a5fa; }
   .finish-hint { color: #fbbf24; font-size: 11px; }
+  .last-turn-hint { text-align: center; color: #6b7280; font-size: 11px; margin: -4px 0 8px; }
+  .last-turn-hint b { color: #9ca3af; }
+  .last-turn-hint.busted { color: #f87171; }
   .slots { display: flex; gap: 6px; margin-bottom: 10px; }
   .slot { flex: 1; border-radius: 8px; padding: 5px 4px; text-align: center; }
   .slot.filled { background: #1f2937; border: 2px solid #374151; }
@@ -55,10 +58,10 @@
   .slot-dash { font-size: 18px; color: #4b5563; }
   .mult-row { display: flex; gap: 6px; margin-bottom: 8px; }
   .mult-btn { flex: 1; padding: 10px 0; border-radius: 8px; border: none; color: #f9fafb; font-weight: bold; font-size: 13px; background: #1f2937; }
-  .num-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 8px; }
+  .num-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 8px; }
   .num-btn { padding: 10px 0; border-radius: 6px; border: 1px solid #374151; background: #1f2937; color: #f9fafb; font-size: 13px; }
   .num-btn.cricket-target { border: 2px solid #f59e0b; background: #292524; font-weight: bold; }
-  .num-btn.bull { color: #fbbf24; }
+  .num-btn.bull { grid-column: span 3; color: #fbbf24; }
   .num-btn.bull.disabled { opacity: .35; cursor: not-allowed; }
   .miss-btn { grid-column: span 2; padding: 10px 0; border-radius: 6px; border: 1px dashed #4b5563; background: #1f2937; color: #e5e7eb; font-size: 13px; font-weight: bold; }
   .miss-btn-solo { display: block; width: 100%; max-width: 320px; margin: 0 auto 8px; padding: 10px 0; border-radius: 6px; border: 1px dashed #4b5563; background: #1f2937; color: #e5e7eb; font-size: 13px; font-weight: bold; }

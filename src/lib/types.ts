@@ -21,6 +21,14 @@ export interface Player {
   totalMarks?: number;
 }
 
+export interface LastTurn {
+  name: string;
+  throws: Throw[];
+  pts: number;
+  scoreAfter: number;
+  busted: boolean;
+}
+
 export interface GameState {
   mode: Mode;
   league: string;
@@ -33,6 +41,7 @@ export interface GameState {
   phase: 'game' | 'won';
   winner: number | null;
   winnerCheckout?: number | null;
+  lastTurn: LastTurn | null;
 }
 
 export interface MatchPlayer {

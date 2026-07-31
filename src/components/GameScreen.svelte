@@ -27,7 +27,14 @@
 
   function pass() {
     pushHistory(g);
-    app.update((s) => ({ ...s, game: advanceTurn({ ...g, throws: [] }), mult: 1 }));
+    const lastTurn = {
+      name: p.name,
+      throws: g.throws,
+      pts: g.throws.reduce((s, t) => s + t.pts, 0),
+      scoreAfter: p.score,
+      busted: false
+    };
+    app.update((s) => ({ ...s, game: advanceTurn({ ...g, lastTurn }), mult: 1 }));
   }
 
   function undo() {
@@ -72,6 +79,8 @@
   $: checkoutSeq = g.mode === '501' && dartsLeft > 0 ? findCheckout(p.score, dartsLeft) : null;
   $: modeLabel = g.mode === '501' ? '🎯 501' : g.cutthroat ? '☠️ Cutthroat' : '🦗 Cricket';
   $: effectiveInputMode = g.mode === 'cricket' && $app.inputMode === 'manual' ? 'buttons' : $app.inputMode;
+  $: bullDisabled = $app.mult === 3;
+  $: bullHit = $toast != null && $toast.val === 25 && $toast.kind === 'bull';
 </script>
 
 <div class="screen">
@@ -133,6 +142,18 @@
     {/if}
   </div>
 
+  {#if g.lastTurn}
+    <div class="last-turn-hint" class:busted={g.lastTurn.busted}>
+      Dernier tour · <b>{g.lastTurn.name}</b> :
+      {g.lastTurn.throws.length ? g.lastTurn.throws.map((t) => formatDart(t)).join(' ') : `${g.lastTurn.pts} pts`}
+      {#if g.lastTurn.busted}
+        · BUST (score inchangé)
+      {:else if g.lastTurn.throws.length}
+        · {g.lastTurn.pts} pts
+      {/if}
+    </div>
+  {/if}
+
   <div class="mode-row">
     <button class="mode-btn" class:active={effectiveInputMode === 'buttons'} on:click={() => setInputMode('buttons')}>🔢 Boutons</button>
     <button class="mode-btn" class:active={effectiveInputMode === 'target'} on:click={() => setInputMode('target')}>🎯 Cible</button>
@@ -178,22 +199,24 @@
       </div>
 
       <div class="num-grid">
-        {#each ALL_NUMS as n}
+        {#each ALL_NUMS.filter((n) => n !== 25) as n}
           {@const isCr = g.mode === 'cricket' && CRICKET_NUMS.indexOf(n) >= 0}
-          {@const isBull = n === 25}
-          {@const bullDisabled = isBull && $app.mult === 3}
-          {@const isHit = $toast != null && $toast.val === n && (isBull ? $toast.kind === 'bull' : n === 20 && $toast.kind === '180')}
+          {@const isHit180 = n === 20 && $toast != null && $toast.val === 20 && $toast.kind === '180'}
           <button
             class="num-btn"
             class:cricket-target={isCr}
-            class:bull={isBull}
-            class:hit={isBull && isHit}
-            class:hit180={n === 20 && isHit}
-            class:disabled={bullDisabled}
-            disabled={bullDisabled}
+            class:hit180={isHit180}
             on:click={(e) => onNumClick(e, n)}
-          >{isBull ? 'Bull' : n}</button>
+          >{n}</button>
         {/each}
+        <button
+          class="num-btn bull"
+          class:cricket-target={g.mode === 'cricket'}
+          class:hit={bullHit}
+          class:disabled={bullDisabled}
+          disabled={bullDisabled}
+          on:click={(e) => onNumClick(e, 25)}
+        >Bull</button>
         <button class="miss-btn" on:click={() => throwDart(1, 0)}>Miss 0</button>
       </div>
     {:else}
